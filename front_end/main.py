@@ -92,7 +92,7 @@ with st.container():
             # Run the automation workflow
             input_fields = {
                 "google_sheets_url": google_sheets_url,
-                "google_drive_folder": google_drive_folder,
+                "google_drive_folder_url": google_drive_folder,
                 "send_email_notifications": send_email_notifications,
                 "email_address": email_address if send_email_notifications else None
             }
@@ -121,7 +121,7 @@ with st.container():
                 {f'- 📧 Email: {email_address}' if send_email_notifications else ''}
                 """)
             else:
-                status_placeholder.error(f"❌ {result.get('message')}")
+                status_placeholder.error(f"❌ {automation_workflow.status}")
     
     # Help section
     if not is_valid:
