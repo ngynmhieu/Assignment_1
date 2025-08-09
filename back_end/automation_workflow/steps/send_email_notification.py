@@ -7,7 +7,6 @@ def main_send_email_notifications(progress_status: str, query_dict: dict, error_
     """
     Main function to send email notifications
     """
-    from email.mime.text import MIMEText
     try:
         # Get email address
         email_address = query_dict.get("email_address")
@@ -40,7 +39,7 @@ def _prepare_mail_content(progress_status: str, query_dict: dict, error_message:
 Your Google Sheet file has been processed successfully.<br>
 <hr>
 """
-    else:
+    elif progress_status == "Failed":
         body = f"""
 <h1 style='color:red;'>❌ Processing Failed</h1>
 <b>Google Sheet File:</b> {file_name}<br>

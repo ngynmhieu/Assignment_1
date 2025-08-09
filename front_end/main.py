@@ -101,7 +101,7 @@ with st.container():
                 "google_drive_folder_url": google_drive_folder,
                 "send_email_notifications": send_email_notifications,
                 "email_address": email_address if send_email_notifications else None,
-                "generate_report": generate_daily_report,
+                "generate_daily_report": generate_daily_report,
             }
 
             # Define simple callback to update spinner
@@ -110,9 +110,10 @@ with st.container():
                     st.info(f"⏳ {message}")
             
             automation_workflow.load_input_data(input_fields, update_status)
-            automation_workflow.process()
-            
-            # Show final result
+            automation_workflow.process_main_steps()
+            automation_workflow.process_optional_steps()
+
+            # Show final result of main process
             if automation_workflow.status == "Success":
                 status_placeholder.success("✅ Processing completed successfully!")
                 
@@ -123,6 +124,12 @@ with st.container():
                 - 💾 Output: Google Drive Folder ID: {google_drive_folder}
                 - 📧 Email Notifications: {'Enabled' if send_email_notifications else 'Disabled'}
                 """)
+            else:
+                status_placeholder.error(f"❌ {automation_workflow.error_message}")
+            
+            # Show final result of optional process
+            if automation_workflow.status_of_optional_steps == "Success":
+                status_placeholder.success("✅ Sending email notifications completed successfully!")
             else:
                 status_placeholder.error(f"❌ {automation_workflow.error_message}")
 

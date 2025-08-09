@@ -2,6 +2,7 @@
 import os
 import shutil
 
+from back_end.automation_workflow.steps.generate_daily_report import main_generate_daily_report
 from back_end.automation_workflow.steps.store_output_data import main_store_output_data
 from back_end.services.google_service.google_service import GoogleService
 from back_end.automation_workflow.steps.load_input_source_data import main_load_input_source_data
@@ -15,16 +16,6 @@ from back_end.services.mongodb_service.mongodb_service import MongoDBService
 TEMP_FOLDER_PATH = os.path.join(os.getcwd(), 'back_end', 'automation_workflow', 'steps', 'shared', 'temp_folder')
 
 class AutomationWorkflow:
-    def generate_report(self, update_status=None):
-        """
-        Generate a summarized report using the ReportGenerator backend service.
-        """
-        from back_end.services.report_generator.report_generator import ReportGenerator
-        report_generator = ReportGenerator()
-        # Use current query_dict as input_fields
-        report = report_generator.generate_daily_report(self.query_dict, update_status or (lambda msg: None))
-        self.query_dict["summarized_report"] = report
-        return report
     def __init__(self) -> None:
         """
         Initialize the Automation Workflow
@@ -32,6 +23,7 @@ class AutomationWorkflow:
         # Initialize attributes
         self.steps = []
         self.status = "Not Started" # Not Started, In Progress, (Success or Failed)
+        self.status_of_optional_steps = "Not Started" # Not Started, In Progress, (Success or Failed)
         self.error_message = ""
         self.status_callback = None # Callback for status updates
         self.google_service = GoogleService()
@@ -39,6 +31,23 @@ class AutomationWorkflow:
 
         # Query dictionary for storing results
         self.query_dict = {}
+    
+    def load_input_data(self, input_fields: dict, status_callback) -> None:
+        """
+        Load input data from Google Sheets
+        """
+        # Prepare input fields
+        input_fields = {
+            "google_sheets_url": input_fields.get("google_sheets_url", ""),
+            "google_drive_folder_url": input_fields.get("google_drive_folder_url", ""),
+            "send_email_notifications": input_fields.get("send_email_notifications", False),
+            "email_address": input_fields.get("email_address", ""),
+            "generate_daily_report": input_fields.get("generate_daily_report", False),
+        }
+        
+        # Result
+        self.query_dict.update(input_fields)
+        self.status_callback = status_callback
 
     # 1. Load input source data
     def _load_input_source_data(self) -> None:
@@ -106,23 +115,7 @@ class AutomationWorkflow:
         else:
             self.stop_process(status="Failed", error_message="Failed to store data to Google Drive")
 
-    def load_input_data(self, input_fields: dict, status_callback) -> None:
-        """
-        Load input data from Google Sheets
-        """
-        # Prepare input fields
-        input_fields = {
-            "google_sheets_url": input_fields.get("google_sheets_url", ""),
-            "google_drive_folder_url": input_fields.get("google_drive_folder_url", ""),
-            "send_email_notifications": input_fields.get("send_email_notifications", False),
-            "email_address": input_fields.get("email_address", "")
-        }
-        
-        # Result
-        self.query_dict.update(input_fields)
-        self.status_callback = status_callback
-        
-    def send_email_notifications(self) -> None:
+    def _send_email_notifications(self) -> None:
         """
         Send email notifications if enabled
         """
@@ -135,16 +128,28 @@ class AutomationWorkflow:
                 
             # Result
             if task_result:
-                self.query_dict["sent_message"] = task_result
-                self.stop_process(status="Success")
+                self._run_next_step("generate_daily_report")
             else:
-                self.stop_process(status="Failed", error_message="Failed to send email notifications")
+                self.stop_process(status_of_optional_steps="Failed", error_message="Failed to send email notifications")
 
-    def process(self) -> dict:
+    def _generate_daily_report(self) -> None:
+        """
+        Generate a daily report.
+        """
+        # Run task
+        task_result = main_generate_daily_report(self.query_dict, self.mongodb_service, self.google_service)
+        
+        # Result
+        if task_result:
+            self.stop_process(status_of_optional_steps="Success")
+        else:
+            self.stop_process(status_of_optional_steps="Failed", error_message="Failed to generate daily report")
+
+    def process_main_steps(self) -> dict:
         """
         Process the automation workflow
         """
-        # Initialize steps
+        # Initialize main steps
         self.status = "In Progress"
         self.steps = {
             "load_input_source_data": {"function": self._load_input_source_data, "description": "Load input source data from Google Sheets"},
@@ -157,6 +162,20 @@ class AutomationWorkflow:
         # Start with the first step
         self._run_next_step("load_input_source_data")
 
+    def process_optional_steps(self) -> dict:
+        """
+        Process the automation workflow
+        """
+        # Initialize main steps
+        self.status_of_optional_steps = "In Progress"
+        self.steps = {
+            "send_email_notifications": {"function": self._send_email_notifications, "description": "Send email notifications"},
+            "generate_daily_report": {"function": self._generate_daily_report, "description": "Generate daily report"},
+        }
+        
+        # Start with the first step
+        self._run_next_step("send_email_notifications")
+
     def _run_next_step(self, next_step_name: str) -> None:
         """
         Run the next step in the workflow
@@ -166,12 +185,18 @@ class AutomationWorkflow:
             self.status_callback(f"Running step: {self.steps[next_step_name]['description']}")
         return self.steps[next_step_name]["function"]()
 
-    def stop_process(self, status: str="Failed", error_message: str="") -> dict:
+    def stop_process(
+        self,
+        status: str=None, 
+        status_of_optional_steps: str=None, 
+        error_message: str=None
+    ) -> dict:
         """
         Finalize the workflow and return the result
         """
-        # Update status and error message
-        self.status = status
+        # Update status and error message (shortened)
+        self.status = status or self.status
+        self.status_of_optional_steps = status_of_optional_steps or self.status_of_optional_steps
         self.error_message = error_message
 
     def reset_resources(self) -> None:
@@ -181,6 +206,7 @@ class AutomationWorkflow:
         self.steps = []
         self.query_dict = {}
         self.status = "Not Started"
+        self.status_of_optional_steps = "Not Started"
         self.error_message = ""
         self._clear_temp_folder()
 
