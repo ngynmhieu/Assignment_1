@@ -14,7 +14,6 @@ if 'automation_workflow' not in st.session_state:
     # Create instance once and store in session state
     st.session_state.automation_workflow = AutomationWorkflow()
 
-# Now you can use the instance throughout your app
 automation_workflow = st.session_state.automation_workflow
 
 # Header with description
@@ -64,6 +63,10 @@ with st.container():
     
     # Email input (only show if checkbox is checked)
     if send_email_notifications:
+        generate_daily_report = st.checkbox(
+            "Generate Daily Report",
+            help="Check this box to generate a daily report"
+        )
         email_address = st.text_input(
             "Email Address",
             placeholder="your-email@example.com",
@@ -89,17 +92,18 @@ with st.container():
         use_container_width=True
     ):
         if is_valid:
+            # Clear previous status messages
+            status_placeholder = st.empty()
+
             # Run the automation workflow
             input_fields = {
                 "google_sheets_url": google_sheets_url,
                 "google_drive_folder_url": google_drive_folder,
                 "send_email_notifications": send_email_notifications,
-                "email_address": email_address if send_email_notifications else None
+                "email_address": email_address if send_email_notifications else None,
+                "generate_report": generate_daily_report,
             }
-            
-            # Create spinner placeholder
-            status_placeholder = st.empty()
-            
+
             # Define simple callback to update spinner
             def update_status(message):
                 with status_placeholder:
@@ -118,11 +122,13 @@ with st.container():
                 - 📊 Input: {google_sheets_url}
                 - 💾 Output: Google Drive Folder ID: {google_drive_folder}
                 - 📧 Email Notifications: {'Enabled' if send_email_notifications else 'Disabled'}
-                {f'- 📧 Email: {email_address}' if send_email_notifications else ''}
                 """)
             else:
-                status_placeholder.error(f"❌ {automation_workflow.status}")
-    
+                status_placeholder.error(f"❌ {automation_workflow.error_message}")
+
+            # Reset resources
+            automation_workflow.reset_resources()
+            
     # Help section
     if not is_valid:
         st.markdown("---")

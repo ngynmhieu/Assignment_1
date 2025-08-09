@@ -8,8 +8,8 @@ from googleapiclient.http import MediaFileUpload
 from google_auth_oauthlib.flow import InstalledAppFlow
 from email.mime.text import MIMEText
 
-SERVICE_ACCOUNT_FILE = "back_end\\google_service\\configs\\automation-workflow-project-73a3cbdd2942.json"
-CLIENT_SECRET_FILE = "back_end\\google_service\\configs\\client_secret_608833324413-fkq10e04u2pht5ksua1rm7j6bjtpeduo.apps.googleusercontent.com.json"
+SERVICE_ACCOUNT_FILE = "back_end\\services\\google_service\\configs\\automation-workflow-project-73a3cbdd2942.json"
+CLIENT_SECRET_FILE = "back_end\\services\\google_service\\configs\\client_secret_608833324413-fkq10e04u2pht5ksua1rm7j6bjtpeduo.apps.googleusercontent.com.json"
 SCOPES = [
     "https://www.googleapis.com/auth/drive.file",
     "https://www.googleapis.com/auth/spreadsheets",
@@ -18,7 +18,7 @@ SCOPES = [
 SERVICES_USE_O2AUTH = ["drive", "gmail"] 
 
 class GoogleService:
-    def get_data_from_sheets(self, google_sheets_url):
+    def get_data_from_sheets(self, google_sheets_url) -> dict   :
         """        
         Get data from Google Sheets
         """
@@ -27,13 +27,22 @@ class GoogleService:
         spreadsheet_id = google_sheets_url.split('/d/')[1].split('/')[0]
         range_name = 'Sheet1!A1:Z1000'
 
-        # Fetch data
+        # Get spreadsheet metadata (file name and sheet names)
         sheet = service.spreadsheets()
-
-        # Result 
+        metadata = sheet.get(spreadsheetId=spreadsheet_id).execute()
+        file_name = metadata.get('properties', {}).get('title', None)
+        sheets = metadata.get('sheets', [])
+        sheet_name = sheets[0]['properties']['title'] if sheets else None
+        range_name = f'{sheet_name}!A1:Z1000' if sheet_name else 'Sheet1!A1:Z1000'
+        # Fetch data
         result = sheet.values().get(spreadsheetId=spreadsheet_id, range=range_name).execute()
-        return result.get('values', [])
-    
+        data = result.get('values', [])
+        return {
+            "data": data,
+            "file_name": file_name,
+            "sheet_name": sheet_name
+        }
+
     def store_data_to_drive(self, file_path, google_drive_folder_path):
         """
         Store data to Google Drive
@@ -68,7 +77,7 @@ class GoogleService:
         subject = subject
         body = body
 
-        message = MIMEText(body)
+        message = MIMEText(body, 'html')
         message['to'] = to
         message['subject'] = subject
 
@@ -104,7 +113,7 @@ class GoogleService:
         creds = None
 
         if api_name in SERVICES_USE_O2AUTH:
-            token_dir = "back_end/google_service/configs"
+            token_dir = "back_end/services/google_service/configs"
             os.makedirs(token_dir, exist_ok=True)
             token_file = os.path.join(token_dir, f"token.pickle")
 

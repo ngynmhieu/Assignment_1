@@ -1,10 +1,8 @@
 
 
-from back_end.google_service.google_service import GoogleService
 import logging
 
-
-def main_load_input_source_data(query_dict: dict, google_service: GoogleService) -> None:
+def main_load_input_source_data(query_dict: dict, google_service) -> None:
     """
     Main function to load input source data for the automation workflow.
     """
@@ -14,9 +12,12 @@ def main_load_input_source_data(query_dict: dict, google_service: GoogleService)
 
         # Load data from Google Sheets
         if google_sheets_url:
-            data = google_service.get_data_from_sheets(google_sheets_url)
-            return data
-    
+            result = google_service.get_data_from_sheets(google_sheets_url)
+            if result.get("data"):
+                # Extract rows from Google Sheet data
+                result["data"] = [dict(zip(result["data"][0], row)) for row in result["data"][1:]]
+                return result
+
     except Exception as e:
         logging.error(f"Error loading input source data: {e}")
-        return []
+        return {}
