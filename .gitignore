@@ -1,3 +1,6 @@
+back_end/automation_workflow/steps/shared/temp_folder
+back_end/services/google_service/configs
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
