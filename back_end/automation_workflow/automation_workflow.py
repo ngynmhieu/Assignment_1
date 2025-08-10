@@ -155,7 +155,7 @@ class AutomationWorkflow:
             "load_input_source_data": {"function": self._load_input_source_data, "description": "Load input source data from Google Sheets"},
             "validate_input_data": {"function": self._validate_input_data, "description": "Validate input data"},
             "generate_content": {"function": self._generate_content, "description": "Generate content by AI models"},
-            "store_output_data": {"function": self._store_output_data, "description": "Store output data in Google Drive"},
+            "store_output_data": {"function": self._store_output_data, "description": "Store output data in MongoDB"},
             "upload_output_data": {"function": self._upload_output_data, "description": "Upload output data to Google Drive"},
         }
         
